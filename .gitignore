@@ -25,3 +25,6 @@ Thumbs.db
 
 # 例外：刺激频率相位表很小且是代码运行所需
 !data_info/Freq_Phase.mat
+
+# 例外：项目汇报 PPT 作为资料公开
+!bci_snn.pptx

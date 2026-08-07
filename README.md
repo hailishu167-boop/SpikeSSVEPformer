@@ -52,6 +52,7 @@ MlpHead-LIF         Linear → LIF「脉冲瓶颈」→ Linear → 40 类
 | `data_info/` | BETA 数据集说明、64 导联位置文件、40 个刺激频率/相位表 |
 | `results_plif/`、`results_deep_temporal/` | 训练曲线（PNG）与指标（JSON） |
 | `docs/` | 📖 三篇中文教程（见上文） |
+| `bci_snn.pptx` | 项目汇报 PPT：整体设计思路与实验结果概览，适合快速了解项目全貌 |
 
 ##  快速开始
 
