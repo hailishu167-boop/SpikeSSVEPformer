@@ -1,6 +1,6 @@
 # 03 · 代码导读与复现教程
 
-> 按数据流向走完整个项目。每个文件讲清楚「输入是什么、输出是什么、关键代码在哪几行」。最后附常见坑和改进方向。
+> 按数据流向走完整个项目。
 
 ## 0. 全局数据流
 
@@ -29,7 +29,7 @@ results_plif/（模型权重 .pth + 指标 .json + 曲线 .png）
 
 输出：`cache_1s/S{n}_data.npy`（shape: trials×11×250）和 `S{n}_labels.npy`。
 
-**练习**：改滤波通带为 8–45 Hz，重训，看准确率怎么变。
+
 
 ## 2. `models/plif_ssvepformer.py` —— 主模型
 
@@ -48,11 +48,11 @@ x_subbands = self.filter_bank(x_fft)                   # ② 切成 3 个子带
 - **为什么保留复数的实部+虚部？** 频谱的幅度告诉你「这个频率有多强」，相位告诉你「响应的时延」。BETA 的 40 个刺激各有特定初始相位，相位也是判别信息，所以不能像很多谱分析方法那样只取幅度谱。
 - **Filter-Bank 子带 (8-45, 16-45, 24-45 Hz)**：基波主要在低频子带，二次谐波落在 16 Hz 以上，三次在 24 Hz 以上。分子带让模型显式分离基波/谐波信息，再用可学习权重融合——这个技巧来自 FB-SSVEPformer，是 SSVEP 领域的经典设计（最早可追溯到 FBCCA）。
 
-**练习**：直接运行 `python models/plif_ssvepformer.py`，会用随机张量测试模型并打印参数量——这是每个模型文件自带的自测。
+
 
 ## 3. `train/train_plif.py` —— 训练脚本
 
-值得学习的工程细节：
+工程细节：
 
 | 技巧 | 位置 | 作用 |
 |------|------|------|
@@ -69,7 +69,7 @@ python scripts/preprocess.py        # 只需一次
 python train/train_plif.py
 ```
 
-结束后看 `results_plif/v4_plif_results.json`，应该得到约 84% 的准确率。
+结束后看 `results_plif/v4_plif_results.json`，应该得到约 80%左右 的准确率。
 
 ## 4. `evaluate.py` 与 `scripts/analyze_per_class.py`
 
@@ -87,17 +87,9 @@ pygame 写的可视化 Demo。流程：你按一个物理键 → 程序从 `cach
 3. **Windows 中文路径**：`loadmat` / `np.load` 对中文路径一般没问题，但如果用 MATLAB 引擎或某些 C 扩展可能报错，建议数据路径用纯英文。
 4. **结果复现不完全一致**：GPU 上的浮点非确定性 + 数据增强随机性，±1% 波动正常。想严格复现就固定 `torch.manual_seed`。
 
-## 7. 局限与改进方向（适合作为你的课程设计/毕设起点）
 
-诚实地说，本项目离论文级工作还有差距，这些正是你可以做的：
 
-1. **严格 LOSO 评估**：目前只在 S35 一个被试上测试。写个循环，轮流把每个被试当测试集（`evaluate.py` 已留好接口），报告 35 次平均 ± 标准差——这才是 BETA 基准的标准协议。
-2. **和 CCA/FBCCA 基线对比**：传统方法不用训练，是很好的 sanity check。
-3. **跨被试自适应**：试试迁移学习——用目标被试的少量数据 fine-tune，通常能大涨。
-4. **更短时间窗**：0.5 s 甚至 0.3 s 窗下保持准确率，ITR 会显著提高（ITR 与时间窗成反比），这是 SSVEP 论文最卷的指标。
-5. **SNN 的功耗分析**：统计脉冲发放率（spike rate），论证 SNN 版本的能效优势——这是 SNN 论文的标准卖点，本项目还没做。
-
-## 8. 推荐拓展阅读
+## 7. 推荐拓展阅读
 
 - SSVEPformer 原论文：Chen et al., *Neural Networks*, 2023
 - BETA 数据集论文：Liu et al., *Frontiers in Neuroscience*, 2020
