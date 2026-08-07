@@ -1,0 +1,27 @@
+# 大文件：原始数据集（BETA benchmark，请自行到官网下载）
+*.mat
+
+# 预处理缓存（可由 scripts/preprocess_cache.py 重新生成）
+cache_1s/
+cache_5s/
+
+# 大体积媒体与文档
+*.mp4
+*.pptx
+ppt_work/
+
+# 训练日志与中间结果（保留 results_*/ 下的 json/png 小文件见下方例外）
+*.log
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.ipynb_checkpoints/
+
+# 系统垃圾
+.DS_Store
+Thumbs.db
+
+# 例外：刺激频率相位表很小且是代码运行所需
+!data_info/Freq_Phase.mat
