@@ -28,21 +28,20 @@ V7 在此基础上进一步引入 **5 子带 Filter-Bank** 结构。
 
 | 路径 | 说明 |
 |------|------|
-| `scripts/preprocess_cache.py` | 数据预处理：`.mat` → 滤波缓存 `.npy`（生成 `cache_1s/`、`cache_5s/`） |
+| `scripts/preprocess.py` | 数据预处理：`.mat` → 滤波缓存 `.npy`（生成 `cache_1s/`、`cache_5s/`） |
 | `scripts/dataset.py` | 数据集加载与 DataLoader |
-| `scripts/compare_v2_v3_v4.py` / `compare_v2_v4_v5.py` | 模型版本对比实验 |
-| `scripts/analyze_per_class.py` | 逐类别准确率分析 |
-| `models/model_v4_plif.py` | V5 最优模型：PLIF 神经元 SNN-SSVEPformer |
-| `models/model_v6_deep_temporal.py` | V6：深层时序 SNN 变体 |
-| `models/model_v7_5band.py` | V7：5 子带 Filter-Bank 版本 |
-| `train/train_v4_plif_fixed_v5.py` | V5 训练脚本（固定拆分 + 弱类别 3× 数据增强） |
-| `train/train_v6_deep_temporal.py` | V6 训练脚本 |
-| `train/train_v7_5band.py` | V7 训练脚本 |
-| `eval_v4_plif.py` | V5 模型评估 |
-| `demo/demo_typing_v4_plif.py` | 交互式「意念打字」Demo（pygame 可视化） |
+| `scripts/analyze_per_class.py` | 逐类别准确率分析，输出弱类别权重 |
+| `models/plif_ssvepformer.py` | 主模型：PLIF 神经元 SNN-SSVEPformer（最优） |
+| `models/deep_temporal_snn.py` | 变体：深层时序 SNN |
+| `models/filterbank_ssvepformer.py` | 变体：5 子带 Filter-Bank |
+| `train/train_plif.py` | 主模型训练脚本（固定拆分 + 弱类别 3× 数据增强） |
+| `train/train_deep_temporal.py` | 深层时序 SNN 训练脚本 |
+| `train/train_filterbank.py` | Filter-Bank 版本训练脚本 |
+| `evaluate.py` | 模型评估（支持逐被试准确率与混淆矩阵绘图） |
+| `demo/typing_demo.py` | 交互式「意念打字」Demo（pygame 可视化） |
 | `checkpoints/` | 训练好的模型权重（`.pth`） |
 | `data_info/` | BETA 数据集说明、64 导联位置、40 个刺激频率/相位表 |
-| `results_*/` | 各版本训练曲线（PNG）与指标（JSON） |
+| `results_plif/`、`results_deep_temporal/` | 训练曲线（PNG）与指标（JSON） |
 
 ## 环境安装
 
@@ -61,27 +60,27 @@ pip install -r requirements.txt
 3. 运行预处理生成缓存：
 
 ```bash
-python scripts/preprocess_cache.py
+python scripts/preprocess.py
 ```
 
 ## 训练与评估
 
 ```bash
-# 训练最优模型 V5（PLIF-SNN，S1-S34 训练 / S35 测试）
-python train/train_v4_plif_fixed_v5.py
+# 训练主模型（PLIF-SNN，S1-S34 训练 / S35 测试）
+python train/train_plif.py
 
-# V6 / V7 变体
-python train/train_v6_deep_temporal.py
-python train/train_v7_5band.py
+# 两个变体
+python train/train_deep_temporal.py
+python train/train_filterbank.py
 
-# 评估 V5
-python eval_v4_plif.py
+# 评估
+python evaluate.py
 ```
 
 ## 交互式 Demo
 
 ```bash
-python demo/demo_typing_v4_plif.py
+python demo/typing_demo.py
 ```
 
 在物理键盘上打字，模型用 S35 的真实 EEG trial 逐字符「读心」预测你按下的字符，实时对比目标文本与预测文本，并统计打字速度与准确率。

@@ -1,14 +1,9 @@
 """
-Fixed-split training V5: S1-S34 train, S35 test
-Key feature: Frequency-domain data augmentation for weak classes (A, F, 4, etc.)
-Augmentations applied to weak-class training samples:
-- Time-domain circular shift (0-20 samples)
-- Gaussian noise injection (SNR ~20dB)
-- Amplitude scaling (0.9-1.1x)
-- Frequency jitter simulation via noise shaping
+Fixed-split training V6: S1-S34 train, S35 test
+Key features: Deep SNN (4-layer PLIF) + Temporal Coding (time-weighted spike aggregation)
 
 Usage:
-    python train_v4_plif_fixed_v5.py --augment_factor 3 --augment_classes 0,5,29
+    python train_v6_deep_temporal.py --n_encoders 4 --temporal_mode exp --temporal_tau 3.0
 """
 import os
 import sys
@@ -24,7 +19,7 @@ import json
 import matplotlib.pyplot as plt
 from math import cos, pi
 
-from models.model_v4_plif import FBSpikeSSVEPformerV4PLIF, FBSSVEPformerV4PLIFBaseline, functional
+from models.deep_temporal_snn import FBSpikeSSVEPformerV6, functional
 
 
 def set_seed(seed=42):
@@ -47,39 +42,31 @@ def compute_itr(accuracy, n_classes=40, time_window=1.0, gaze_shift=0.5):
 
 
 def augment_eeg(x, noise_std=0.5, shift_max=20, scale_range=(0.9, 1.1)):
-    """
-    Augment a single EEG trial (Chans, Samples).
-    x: numpy array shape (11, 250)
-    """
+    """Augment a single EEG trial (Chans, Samples)."""
     x_aug = x.copy()
     
-    # 1. Amplitude scaling
+    # Amplitude scaling
     scale = np.random.uniform(*scale_range)
     x_aug = x_aug * scale
     
-    # 2. Circular time shift (0 to shift_max samples)
+    # Circular time shift
     shift = np.random.randint(-shift_max, shift_max + 1)
     if shift != 0:
         x_aug = np.roll(x_aug, shift, axis=1)
     
-    # 3. Gaussian noise (SNR ~20dB)
+    # Gaussian noise
     noise = np.random.normal(0, noise_std, x_aug.shape)
     x_aug = x_aug + noise
     
-    # 4. Frequency-domain noise shaping (boost high-freq noise to simulate jitter)
-    # Apply a small high-pass emphasis to noise for weak classes
+    # High-frequency noise shaping
     if np.random.rand() > 0.5:
-        # Simple high-frequency emphasis: difference filter
         x_aug[:, 1:] = x_aug[:, 1:] + 0.1 * np.diff(x_aug, axis=1)
     
     return x_aug.astype(np.float32)
 
 
 def augment_weak_classes(X, y, weak_classes, factor=3):
-    """
-    For each sample belonging to weak_classes, generate `factor` augmented copies.
-    Returns augmented X, y appended to original.
-    """
+    """For each weak-class sample, generate `factor` augmented copies."""
     X_list = [X]
     y_list = [y]
     
@@ -145,14 +132,17 @@ def evaluate(model, dataloader, criterion, device, use_snn=False):
     return total_loss / total, 100.0 * correct / total, np.array(all_preds), np.array(all_targets)
 
 
-def run_fixed_split(data_dir, cache_dir, model_type='v4_plif', epochs=300, lr=0.001,
-                    batch_size=256, save_dir='results_v4_plif_fixed_v5', patience=80, T_snn=12,
+def run_fixed_split(data_dir, cache_dir, epochs=300, lr=0.001,
+                    batch_size=256, save_dir='results_deep_temporal', patience=80, T_snn=12,
                     warmup_epochs=10, drop_rate=0.5,
-                    augment_factor=3, augment_classes=None):
-    """Fixed split: S1-S34 train, S35 test. V5 with weak-class data augmentation."""
+                    augment_factor=3, augment_classes=None,
+                    n_encoders=4, temporal_mode='exp', temporal_tau=3.0):
+    """Fixed split: S1-S34 train, S35 test. V6 with deep SNN + temporal coding."""
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print(f"Device: {device}")
     print(f"Config: dropout={drop_rate}, Adam, T_snn={T_snn}, warmup={warmup_epochs}, patience={patience}")
+    print(f"Deep SNN: {n_encoders} layers")
+    print(f"Temporal Coding: mode={temporal_mode}, tau={temporal_tau}")
     print(f"Data Augmentation: factor={augment_factor}, classes={augment_classes}")
     os.makedirs(save_dir, exist_ok=True)
     
@@ -176,9 +166,9 @@ def run_fixed_split(data_dir, cache_dir, model_type='v4_plif', epochs=300, lr=0.
     
     print(f"Train (S1-S34) before aug: {X_train.shape}")
     
-    # Default weak classes: A(0), F(5), 4(29), and others from previous analysis
+    # Default weak classes: A(0), F(5), 4(29)
     if augment_classes is None:
-        augment_classes = [0, 5, 29]  # A, F, 4
+        augment_classes = [0, 5, 29]
     
     # Augment weak classes
     X_train, y_train = augment_weak_classes(X_train, y_train, augment_classes, factor=augment_factor)
@@ -191,20 +181,13 @@ def run_fixed_split(data_dir, cache_dir, model_type='v4_plif', epochs=300, lr=0.
     test_loader = DataLoader(test_ds, batch_size=batch_size, shuffle=False, num_workers=0, pin_memory=True)
     
     # Create model
-    if model_type == 'v4_plif_base':
-        model = FBSSVEPformerV4PLIFBaseline(
-            Chans=11, n_classes=40, fs=250,
-            band=[8, 45], resolution=0.25, drop_rate=drop_rate,
-            n_subbands=3
-        ).to(device)
-        use_snn = False
-    else:
-        model = FBSpikeSSVEPformerV4PLIF(
-            Chans=11, n_classes=40, fs=250,
-            band=[8, 45], resolution=0.25, drop_rate=drop_rate,
-            n_subbands=3, T_snn=T_snn
-        ).to(device)
-        use_snn = True
+    model = FBSpikeSSVEPformerV6(
+        Chans=11, n_classes=40, fs=250,
+        band=[8, 45], resolution=0.25, drop_rate=drop_rate,
+        n_subbands=3, T_snn=T_snn, n_encoders=n_encoders,
+        temporal_mode=temporal_mode, temporal_tau=temporal_tau
+    ).to(device)
+    use_snn = True
     
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     print(f"Parameters: {n_params:,}")
@@ -245,8 +228,8 @@ def run_fixed_split(data_dir, cache_dir, model_type='v4_plif', epochs=300, lr=0.
             best_epoch = ep
             patience_counter = 0
             best_state = model.state_dict()
-            torch.save(best_state, os.path.join(save_dir, f'{model_type}_best_model.pth'))
-            torch.save(best_state, os.path.join(save_dir, f'{model_type}_S35_model.pth'))
+            torch.save(best_state, os.path.join(save_dir, 'v6_best_model.pth'))
+            torch.save(best_state, os.path.join(save_dir, 'v6_S35_model.pth'))
         else:
             patience_counter += 1
         
@@ -259,7 +242,7 @@ def run_fixed_split(data_dir, cache_dir, model_type='v4_plif', epochs=300, lr=0.
             break
     
     # Final evaluation with best model
-    model.load_state_dict(torch.load(os.path.join(save_dir, f'{model_type}_best_model.pth'), map_location=device))
+    model.load_state_dict(torch.load(os.path.join(save_dir, 'v6_best_model.pth'), map_location=device))
     _, final_acc, preds, targets = evaluate(model, test_loader, criterion, device, use_snn)
     
     itr = compute_itr(final_acc / 100.0, time_window=1.0)
@@ -273,16 +256,20 @@ def run_fixed_split(data_dir, cache_dir, model_type='v4_plif', epochs=300, lr=0.
             final_class_acc[c] = (preds[mask] == c).sum() / total
     
     print(f"\n{'='*60}")
-    print(f"FINAL RESULTS V5 ({model_type}, weak-class augmentation x{augment_factor})")
+    print(f"FINAL RESULTS V6 (Deep SNN + Temporal Coding)")
     print(f"{'='*60}")
     print(f"Best Test Accuracy: {best_acc:.2f}% (epoch {best_epoch + 1})")
     print(f"Final Test Accuracy: {final_acc:.2f}%")
     print(f"ITR: {itr:.2f} bits/min")
-    print(f"Model saved: {save_dir}/{model_type}_S35_model.pth")
+    print(f"Model saved: {save_dir}/v6_S35_model.pth")
+    
+    # Save temporal weights for reference
+    temporal_weights = model.head.get_temporal_weights().tolist()
+    print(f"Temporal weights: {[f'{w:.3f}' for w in temporal_weights]}")
     
     # Save results
     results = {
-        'model_type': model_type,
+        'model_type': 'v6_deep_temporal',
         'train_subjects': 'S1-S34',
         'test_subject': 'S35',
         'best_accuracy': float(best_acc),
@@ -293,13 +280,17 @@ def run_fixed_split(data_dir, cache_dir, model_type='v4_plif', epochs=300, lr=0.
         'dropout': drop_rate,
         'optimizer': 'Adam',
         'T_snn': T_snn,
+        'n_encoders': n_encoders,
         'warmup_epochs': warmup_epochs,
+        'temporal_mode': temporal_mode,
+        'temporal_tau': temporal_tau,
+        'temporal_weights': temporal_weights,
         'augment_factor': augment_factor,
         'augment_classes': augment_classes,
         'final_class_acc': {int(k): float(v) for k, v in final_class_acc.items()},
         'history': history
     }
-    with open(os.path.join(save_dir, f'{model_type}_results.json'), 'w') as f:
+    with open(os.path.join(save_dir, 'v6_results.json'), 'w') as f:
         json.dump(results, f, indent=2)
     
     # Plot curves
@@ -335,31 +326,37 @@ def run_fixed_split(data_dir, cache_dir, model_type='v4_plif', epochs=300, lr=0.
     plt.grid(True, alpha=0.3)
     
     plt.tight_layout()
-    plt.savefig(os.path.join(save_dir, f'{model_type}_curves.png'), dpi=150)
+    plt.savefig(os.path.join(save_dir, 'v6_curves.png'), dpi=150)
     plt.close()
-    print(f"Curves saved: {save_dir}/{model_type}_curves.png")
+    print(f"Curves saved: {save_dir}/v6_curves.png")
     
     return best_acc, final_acc, itr
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Train V4-PLIF V5: S1-S34 train, S35 test (weak-class data augmentation)')
-    parser.add_argument('--data_dir', type=str, default=r'D:\\学习资料\\BCI\\40分类')
+    parser = argparse.ArgumentParser(description='Train V6: S1-S34 train, S35 test (Deep SNN + Temporal Coding)')
+    parser.add_argument('--data_dir', type=str, default='.')
     parser.add_argument('--cache_dir', type=str, default='cache_1s')
-    parser.add_argument('--model_type', type=str, default='v4_plif', choices=['v4_plif', 'v4_plif_base'])
     parser.add_argument('--epochs', type=int, default=300)
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--lr', type=float, default=0.001)
-    parser.add_argument('--save_dir', type=str, default='results_v4_plif_fixed_v5')
+    parser.add_argument('--save_dir', type=str, default='results_deep_temporal')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--T_snn', type=int, default=12)
     parser.add_argument('--patience', type=int, default=80)
     parser.add_argument('--warmup_epochs', type=int, default=10)
     parser.add_argument('--drop_rate', type=float, default=0.5)
+    parser.add_argument('--n_encoders', type=int, default=4,
+                        help='Number of PLIFEncoder layers per subband (default 4, was 2 in V5)')
+    parser.add_argument('--temporal_mode', type=str, default='exp',
+                        choices=['exp', 'linear', 'inverse', 'uniform'],
+                        help='Temporal weighting mode: exp, linear, inverse, uniform')
+    parser.add_argument('--temporal_tau', type=float, default=3.0,
+                        help='Temporal decay constant for exp mode (default 3.0)')
     parser.add_argument('--augment_factor', type=int, default=3,
-                        help='Number of augmented copies per weak-class sample (default 3)')
+                        help='Number of augmented copies per weak-class sample')
     parser.add_argument('--augment_classes', type=str, default='0,5,29',
-                        help='Comma-separated class IDs to augment (default: 0,5,29 = A,F,4)')
+                        help='Comma-separated class IDs to augment')
     args = parser.parse_args()
     
     set_seed(args.seed)
@@ -367,11 +364,13 @@ def main():
     
     augment_classes = [int(c.strip()) for c in args.augment_classes.split(',')]
     
-    run_fixed_split(args.data_dir, cache_dir, args.model_type,
+    run_fixed_split(args.data_dir, cache_dir,
                     epochs=args.epochs, batch_size=args.batch_size, lr=args.lr,
                     save_dir=args.save_dir, patience=args.patience, T_snn=args.T_snn,
                     warmup_epochs=args.warmup_epochs, drop_rate=args.drop_rate,
-                    augment_factor=args.augment_factor, augment_classes=augment_classes)
+                    augment_factor=args.augment_factor, augment_classes=augment_classes,
+                    n_encoders=args.n_encoders, temporal_mode=args.temporal_mode,
+                    temporal_tau=args.temporal_tau)
 
 
 if __name__ == '__main__':

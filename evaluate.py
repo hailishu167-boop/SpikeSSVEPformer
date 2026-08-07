@@ -5,8 +5,8 @@ Loads all 35 LOSO-trained models and evaluates each on its held-out subject.
 Prints overall accuracy summary and optionally generates per-subject bar chart.
 
 Usage:
-    python eval_v4_plif.py --results_dir results_v4_plif --model_type v4_plif
-    python eval_v4_plif.py --results_dir results_v4_plif --model_type v4_plif --plot
+    python evaluate.py --results_dir results_plif --model_type v4_plif
+    python evaluate.py --results_dir results_plif --model_type v4_plif --plot
 """
 import os
 import sys
@@ -17,7 +17,7 @@ import torch
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix
 
-from models.model_v4_plif import FBSpikeSSVEPformerV4PLIF, FBSSVEPformerV4PLIFBaseline, functional
+from models.plif_ssvepformer import FBSpikeSSVEPformerV4PLIF, FBSSVEPformerV4PLIFBaseline, functional
 
 
 def load_model_for_subject(subject_id, model_type, results_dir, device):
@@ -116,7 +116,7 @@ def evaluate_all_subjects(cache_dir, results_dir, model_type='v4_plif', n_subjec
     return all_accs, per_subject_results
 
 
-def plot_results(all_accs, per_subject_results, model_type, save_dir='results_v4_plif'):
+def plot_results(all_accs, per_subject_results, model_type, save_dir='results_plif'):
     """Generate per-subject accuracy bar chart and confusion matrix."""
     os.makedirs(save_dir, exist_ok=True)
     
@@ -185,9 +185,9 @@ def plot_results(all_accs, per_subject_results, model_type, save_dir='results_v4
 def main():
     import argparse
     parser = argparse.ArgumentParser(description='Evaluate V4-PLIF LOSO models')
-    parser.add_argument('--data_dir', type=str, default=r'D:\\学习资料\\BCI\\40分类')
+    parser.add_argument('--data_dir', type=str, default='.')
     parser.add_argument('--cache_dir', type=str, default='cache_1s')
-    parser.add_argument('--results_dir', type=str, default='results_v4_plif')
+    parser.add_argument('--results_dir', type=str, default='results_plif')
     parser.add_argument('--model_type', type=str, default='v4_plif', choices=['v4_plif', 'v4_plif_base'])
     parser.add_argument('--plot', action='store_true', help='Generate plots')
     args = parser.parse_args()
@@ -206,7 +206,7 @@ def main():
     if args.plot:
         plot_results(all_accs, per_subject_results, args.model_type, results_dir)
     
-    print(f"\nTo generate plots, run: python eval_v4_plif.py --model_type {args.model_type} --plot")
+    print(f"\nTo generate plots, run: python evaluate.py --model_type {args.model_type} --plot")
 
 
 if __name__ == '__main__':

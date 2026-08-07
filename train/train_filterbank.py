@@ -23,7 +23,7 @@ import json
 import matplotlib.pyplot as plt
 from math import cos, pi
 
-from models.model_v7_5band import FBSpikeSSVEPformerV7, FBSpikeSSVEPformerV7ANN, functional
+from models.filterbank_ssvepformer import FBSpikeSSVEPformerV7, FBSpikeSSVEPformerV7ANN, functional
 
 
 def set_seed(seed=42):
@@ -125,7 +125,7 @@ def evaluate(model, dataloader, criterion, device, use_snn=False):
 
 
 def run_fixed_split(data_dir, cache_dir, model_type='v7_snn', epochs=300, lr=0.001,
-                    batch_size=256, save_dir='results_v7_5band', patience=80, T_snn=12,
+                    batch_size=256, save_dir='results_filterbank', patience=80, T_snn=12,
                     warmup_epochs=10, drop_rate=0.3,
                     augment_factor=3, augment_classes=None):
     """固定拆分：S1-S34训练，S35测试。V7 5子带FB。"""
@@ -319,13 +319,13 @@ def run_fixed_split(data_dir, cache_dir, model_type='v7_snn', epochs=300, lr=0.0
 
 def main():
     parser = argparse.ArgumentParser(description='V7: 5-band Filter-Bank + SNN (S1-S34 train, S35 test)')
-    parser.add_argument('--data_dir', type=str, default=r'D:\\学习资料\\BCI\\40分类')
+    parser.add_argument('--data_dir', type=str, default='.')
     parser.add_argument('--cache_dir', type=str, default='cache_1s')
     parser.add_argument('--model_type', type=str, default='v7_snn', choices=['v7_snn', 'v7_ann'])
     parser.add_argument('--epochs', type=int, default=300)
     parser.add_argument('--batch_size', type=int, default=256)
     parser.add_argument('--lr', type=float, default=0.001)
-    parser.add_argument('--save_dir', type=str, default='results_v7_5band')
+    parser.add_argument('--save_dir', type=str, default='results_filterbank')
     parser.add_argument('--seed', type=int, default=42)
     parser.add_argument('--T_snn', type=int, default=12)
     parser.add_argument('--patience', type=int, default=80)

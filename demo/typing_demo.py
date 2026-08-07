@@ -4,7 +4,7 @@ Type a message on your physical keyboard, and the model will "read your mind"
 using real EEG trials from S35. Compare what you typed vs what the model predicted.
 
 Usage:
-    python demo/demo_typing_v4_plif.py
+    python demo/typing_demo.py
 
 Features:
 - Physical keyboard input (type naturally, no mouse clicking)
@@ -24,7 +24,7 @@ import threading
 import time
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from models.model_v4_plif import FBSpikeSSVEPformerV4PLIF, functional
+from models.plif_ssvepformer import FBSpikeSSVEPformerV4PLIF, functional
 
 # Map keyboard keys to class IDs (0-39)
 KEY_MAP = {
@@ -46,7 +46,7 @@ CLASS_LABELS = [
 ]
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-MODEL_PATH = 'results_v4_plif_fixed_v5/v4_plif_S35_model.pth'
+MODEL_PATH = 'results_plif/v4_plif_S35_model.pth'
 CACHE_DIR = 'cache_1s'
 
 

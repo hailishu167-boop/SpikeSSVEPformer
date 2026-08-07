@@ -6,7 +6,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from models.model_v4_plif import FBSpikeSSVEPformerV4PLIF, functional
+from models.plif_ssvepformer import FBSpikeSSVEPformerV4PLIF, functional
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -22,7 +22,7 @@ def load_model():
         band=[8, 45], resolution=0.25, drop_rate=0.5,
         n_subbands=3, T_snn=12
     ).to(DEVICE)
-    model.load_state_dict(torch.load('results_v4_plif_fixed_v2/v4_plif_S35_model.pth', map_location=DEVICE))
+    model.load_state_dict(torch.load('results_plif/v4_plif_S35_model.pth', map_location=DEVICE))
     model.eval()
     return model
 
@@ -112,15 +112,15 @@ def analyze():
     print(f"Weak class chars: {''.join([CLASS_LABELS[c] for c in weak_classes])}")
     
     # Save
-    os.makedirs('results_v4_plif_fixed_v2', exist_ok=True)
-    with open('results_v4_plif_fixed_v2/class_weights.json', 'w') as f:
+    os.makedirs('results_plif', exist_ok=True)
+    with open('results_plif/class_weights.json', 'w') as f:
         json.dump({
             'avg_acc': float(avg_acc),
             'class_acc': {int(k): float(v) for k, v in class_acc.items()},
             'weights': weights.tolist(),
             'weak_classes': [int(c) for c in weak_classes]
         }, f, indent=2)
-    print("\nSaved to results_v4_plif_fixed_v2/class_weights.json")
+    print("\nSaved to results_plif/class_weights.json")
 
 if __name__ == '__main__':
     analyze()

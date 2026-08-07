@@ -328,7 +328,7 @@ def create_loso_datasets(data_dir, test_subject_id, time_window=1.0, fs=250.0,
 
 if __name__ == '__main__':
     # Test dataset loading
-    data_dir = r'D:\学习资料\BCI\40分类'
+    data_dir = '.'
     
     print("Testing dataset loading...")
     

@@ -76,7 +76,7 @@ if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--time_window', type=float, default=5.0)
-    parser.add_argument('--data_dir', type=str, default=r'D:\学习资料\BCI\40分类')
+    parser.add_argument('--data_dir', type=str, default='.')
     args = parser.parse_args()
     
     cache_dir = os.path.join(args.data_dir, f'cache_{int(args.time_window)}s')
